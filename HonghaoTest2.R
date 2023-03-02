@@ -17,4 +17,4 @@ summary(Freq1)
 
 Freq1 <- glm(ClaimInd ~ Gender, data=freMPL1, family="binomial")
 
-123
+123456
