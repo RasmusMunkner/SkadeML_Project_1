@@ -16,3 +16,5 @@ Freq1 <- glm(ClaimInd ~ DrivAge + offset(Exposure), data=freMPL1, family="binomi
 summary(Freq1)
 
 Freq1 <- glm(ClaimInd ~ Gender, data=freMPL1, family="binomial")
+
+123
