@@ -1,5 +1,3 @@
-
-
 ##### 1. Load packages and data ######
 library(dplyr)
 
