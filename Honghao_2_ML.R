@@ -49,7 +49,7 @@ frempl1_split <- initial_split(tree, prop = .7)
 frempl1_train <- training(frempl1_split)
 frempl1_test  <- testing(frempl1_split)
 
-##### 3. First ML model using randomForest()
+##### 3. First ML model using randomForest() #####
 m1 <- randomForest(
   formula = Claim ~ .,
   data    = frempl1_train
@@ -69,7 +69,12 @@ sqrt(mean((pred-frempl1_test$Claim)^2))
 
 
 
-##### 3. hyperparameter search (tuner) #####
+
+
+
+
+
+##### 4. hyperparameter search (tuner) #####
 # Man kan bruge tuner til at finde endnu bedre modeller. 
 # Jeg har ikke haft tid til at rydde op, fordi kode tager for lang tid at køre.
 features <- setdiff(names(frempl1_train), "Claim")
@@ -136,7 +141,7 @@ optimal_ranger$variable.importance %>%
 
 
 
-##### 4. h2o #####
+##### 5. h2o #####
 #install.packages("h2o")
 h2o.shutdown()
 h2o.no_progress()
