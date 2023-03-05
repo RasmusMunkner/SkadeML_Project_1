@@ -1,21 +1,15 @@
 ##### 1. Load packages and data ######
 library(dplyr)
-
-#Installing packages
 #install.packages(c("xts", "sp", "zoo"))
 #install.packages("CASdatasets", repos = "http://cas.uqam.ca/pub/", type="source")
 #install.packages('gmodels')
 library(gmodels)
-
-#Load the package containing the dataset
 library(CASdatasets)
 ?CASdatasets
 
 #Load the data into memory
 data("freMPL1")
 
-set.seed(1)
-freMPL1$X <- rbinom(30595,1,8/18)
 
 ##### 2. Exploratory Analysis - Freq model ######
 freMPL1 %>%
@@ -61,8 +55,11 @@ freMPL1$BonusMalusG <- cut(freMPL1$BonusMalus, breaks=c(49,60,80,272))
 freMPL1$VehPriceG <- (freMPL1$VehPrice %in% c("Z", "Y", "X", "W", "V", "U", "T", "S", "R", "Q"))
 freMPL1$VehClassG <- (freMPL1$VehClass %in% c("H"))
 
-freMPL1train <- subset(freMPL1,X==1)
-freMPL1test <- subset(freMPL1, X==0)
+
+set.seed(1)
+frempl1_split <- initial_split(freMPL1, prop = .7)
+freMPL1_train <- training(frempl1_split)
+freMPL1_test  <- testing(frempl1_split)
 
 Freq1 <- glm(ClaimInd ~ (LicAge<60) + 
                SocioCategInd +
@@ -73,11 +70,11 @@ Freq1 <- glm(ClaimInd ~ (LicAge<60) +
                (BonusMalus<100) + 
                #(VehEngine == "direct injection overpowered")+
                (VehEnergy == "diesel")+
-               offset(log(Exposure)), data=freMPL1train, family="binomial")
+               offset(log(Exposure)), data=freMPL1_train, family="binomial")
 summary(Freq1)
 
 
-freMPL1Claim <- subset(freMPL1train, ClaimInd==1)
+freMPL1Claim <- subset(freMPL1_train, ClaimInd==1)
 #Lognormal distribution fits the data well
 hist(log(freMPL1Claim$ClaimAmount))
 qqnorm(log(freMPL1Claim$ClaimAmount))
@@ -104,6 +101,6 @@ summary(predict(Claim1, freMPL1, type = "response"))
 summary(predict(Freq1, freMPL1, type = "response")/freMPL1$Exposure) 
 summary(predict(Claim1, freMPL1, type = "response") *predict(Freq1, freMPL1, type = "response")/freMPL1$Exposure)
 
-EST <- predict(Claim1, freMPL1test, type = "response") * predict(Freq1, freMPL1test, type = "response") / (freMPL1test$Exposure)
-sqrt(mean((EST- freMPL1test$ClaimAmount * freMPL1test$ClaimInd)^2))
-
+EST <- predict(Claim1, freMPL1_test, type = "response") * predict(Freq1, freMPL1_test, type = "response")
+sqrt(mean((EST- freMPL1_test$ClaimAmount * freMPL1_test$ClaimInd)^2))
+# GLM: sqrt(MSE) = 2326.325
