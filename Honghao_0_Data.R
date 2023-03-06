@@ -47,3 +47,9 @@ freMPL1$VehBodyInd2 <- (freMPL1$VehBody == "station wagon")
 freMPL1$VehClassG <- (freMPL1$VehClass %in% c(0, "H"))
 freMPL1$VehClassG <- (freMPL1$VehClass %in% c("H"))
 
+
+##### Split #####
+set.seed(1)
+frempl1_split <- initial_split(freMPL1, prop = .7)
+frempl1_train <- training(frempl1_split)
+frempl1_test  <- testing(frempl1_split)
