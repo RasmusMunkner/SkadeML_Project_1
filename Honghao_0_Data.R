@@ -1,5 +1,10 @@
 ##### 1. Load packages and data ######
 library(dplyr)
+library(ggplot2)
+library(stringr)
+library(tidyverse)
+library(mlr3verse)
+source("Rasmus_Funktioner.R")
 #install.packages(c("xts", "sp", "zoo"))
 #install.packages("CASdatasets", repos = "http://cas.uqam.ca/pub/", type="source")
 #install.packages('gmodels')
@@ -13,6 +18,13 @@ data("freMPL1")
 freMPL1Claim <- subset(freMPL1, ClaimInd==1)
 summary(freMPL1Claim$ClaimAmount) #No zero claims
 
+#Recode SocioCateg such that the factor levels are monotonically ordered
+freMPL1 <- freMPL1 %>% 
+  mutate(SocioCateg = SocioCateg %>%
+           as.character() %>% 
+           map_chr(.f = substr, start = 4, stop = 999) %>% 
+           map_dbl(.f = as.numeric) %>% 
+           factor(levels = 1:100))
 
 ##### Exploratory Analysis - Freq model ######
 #Change "SocioCateg" to other variables.
@@ -20,7 +32,23 @@ summary(freMPL1Claim$ClaimAmount) #No zero claims
 freMPL1 %>%
   group_by(SocioCateg) %>%
   summarise(AntSka = sum(ClaimInd), AntFaar=sum(Exposure), Frek = sum(ClaimInd)/sum(Exposure)) %>%
+  #arrange(-AntFaar) %>% 
   print(n=100)
+
+freMPL1 %>% 
+  TreeModelGrouping(.feature = "SocioCateg", .target = "ClaimInd") %>% 
+  ggplot(aes(x = SocioCateg)) +
+  geom_point(aes(y = Pred))
+
+freMPL1 %>% 
+  TreeModelGrouping(.feature = "SocioCateg", .target = "ClaimInd") %>% 
+  group_by(SocioCateg) %>% 
+  summarise(n = n())
+
+freMPL1 %>% 
+  TreeModelGrouping(.feature = "SocioCateg", .target = "ClaimInd", featureName = "SocioCategG") %>%
+  ggplot(aes(x = SocioCateg, y = Pred)) +
+  geom_point()
 
 ##The following vairbles have the biggest impact on the empirical frequency.
 freMPL1$LicAgeInd <- (freMPL1$LicAge<60)
