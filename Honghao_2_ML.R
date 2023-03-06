@@ -40,9 +40,13 @@ freMPL1$VehBodyInd2 <- (freMPL1$VehBody == "station wagon")
 freMPL1$VehClassG <- (freMPL1$VehClass %in% c("H"))
 freMPL1$Claim <- freMPL1$ClaimAmount * freMPL1$ClaimInd
 
-tree <- freMPL1[c("Exposure", "LicAgeInd", "SocioCategInd", "VehUsageInd", 
-                  "VehBodyInd", "HasKmLimit", "BonusMalusInd", "VehEnergyInd",
-                  "BonusMalusG", "VehBodyInd2", "VehClassG", "Claim")]
+#tree <- freMPL1[c("Exposure", "LicAgeInd", "SocioCategInd", "VehUsageInd", 
+#                  "VehBodyInd", "HasKmLimit", "BonusMalusInd", "VehEnergyInd",
+#                  "BonusMalusG", "VehBodyInd2", "VehClassG", "Claim")]
+tree <- freMPL1
+tree$RecordEnd <- 0
+tree$ClaimInd <- 0
+tree$ClaimAmount <- 0 
 
 set.seed(1)
 frempl1_split <- initial_split(tree, prop = .7)
@@ -65,8 +69,8 @@ summary(pred)
 sqrt(mean((pred-frempl1_test$Claim)^2))
 
 #ML trees first model: 
-# sqrt(MSE)=2292.951
-
+# sqrt(MSE) = 2292.951 for the chosen variables
+# sqrt(MSE) = 2063.567 for the whole data set
 
 
 
