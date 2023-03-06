@@ -5,6 +5,7 @@ library(dplyr)
 #install.packages('gmodels')
 library(gmodels)
 library(CASdatasets)
+library(rsample)
 ?CASdatasets
 
 #Load the data into memory
@@ -35,7 +36,7 @@ freMPL1$VehEnergyInd <- (freMPL1$VehEnergy == "diesel")
 
 ##### Exploratory Analysis - Claim model ######
 freMPL1Claim %>%
-  group_by(floor(BonusMalus/10)) %>%
+  group_by(VehClass) %>%
   summarise(AntSka = sum(ClaimInd), AntFaar=sum(Exposure), Median = median(ClaimAmount), Middel = mean(ClaimAmount)) %>%
   print(n=100)
 
@@ -44,12 +45,18 @@ freMPL1$LicAgeInd <- (freMPL1$LicAge<60)
 #MariStat
 freMPL1$BonusMalusG <- cut(freMPL1$BonusMalus, breaks=c(49,60,80,272))
 freMPL1$VehBodyInd2 <- (freMPL1$VehBody == "station wagon")
-freMPL1$VehClassG <- (freMPL1$VehClass %in% c(0, "H"))
 freMPL1$VehClassG <- (freMPL1$VehClass %in% c("H"))
+freMPL1$VehPriceG <- (freMPL1$VehPrice %in% c("Z", "Y", "X", "W", "V", "U", "T", "S", "R", "Q"))
 
+
+
+freMPL1_final <- freMPL1[c("LicAgeInd", "SocioCategInd", "VehUsageInd", "VehBodyInd",
+                          "DrivAgeInd", "HasKmLimit", "BonusMalusInd", "VehEngineInd", 
+                          "VehEnergyInd", "MariStat", "BonusMalusG", "VehBodyInd2", 
+                          "VehClassG", "VehPriceG", "ClaimInd", "ClaimAmount")]
 
 ##### Split #####
 set.seed(1)
-frempl1_split <- initial_split(freMPL1, prop = .7)
+frempl1_split <- initial_split(freMPL1_final, prop = .7)
 frempl1_train <- training(frempl1_split)
 frempl1_test  <- testing(frempl1_split)
