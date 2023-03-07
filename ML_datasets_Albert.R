@@ -51,6 +51,7 @@ freq_df <- freMPL1 %>%
                     filter(!VehEngine %in% c("electric","GPL"))%>%
                         droplevels()%>%
                     mutate(LicAge = as.numeric(LicAge))%>%
+                    mutate(HasKmLimit=as.factor(HasKmLimit))%>%
                     mutate(Sedan=as.factor(VehBody == "sedan"))%>%
                     select(-c(ClaimInd,RecordEnd, ClaimAmount,
                               Garage, Gender, MariStat,
@@ -69,11 +70,23 @@ crosstab(freq_df, row.vars = "VehMaxSpeed", col.vars = "VehEnergy", type="f")
 
 claimsize_df <- freMPL1 %>%
                 filter(ClaimInd==1)%>%
-                  select(-c(ClaimInd,RecordEnd,
-                          Gender, MariStat, SocioCateg,
-                          VehPrice,RiskVar,RecordBeg,
-                          VehClass))
-  
+                mutate(LicAge = as.numeric(LicAge))%>%
+                mutate(HasKmLimit=as.factor(HasKmLimit))%>%
+                mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
+                mutate(Old=as.factor(VehAge=="10+"))%>%
+                filter(VehEnergy %in% c("regular","diesel"))%>%
+                droplevels()%>%
+                filter(!VehEngine %in% c("electric","GPL"))%>%
+                droplevels()%>%
+                mutate(Sedan=as.factor(VehBody == "sedan"))%>%
+                select(-c(ClaimInd,RecordEnd,
+                        Gender, MariStat, SocioCateg,
+                        VehPrice,RiskVar,RecordBeg,
+                        VehClass, VehAge, VehPrice,
+                        BonusMalus, Exposure, VehBody))
+
+
+
   
 claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150 km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
                                   "150-200 km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
