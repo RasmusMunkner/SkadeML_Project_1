@@ -17,8 +17,9 @@ library(CASdatasets)
 #Load the data into memory
 data("freMPL1")
 
-#Generally
-#Observe that 
+
+#We make a series of crosstables between variables to get a feel
+#for the data
 crosstab(freMPL1, row.vars = "VehEngine", col.vars = "VehEnergy")  
 crosstab(freMPL1, row.vars = "VehEngine", col.vars = "ClaimInd")  
 crosstab(freMPL1, row.vars = "VehEngine", col.vars = "ClaimInd", type = "r")  
@@ -53,11 +54,11 @@ freq_df <- freMPL1 %>%
                     mutate(LicAge = as.numeric(LicAge))%>%
                     mutate(HasKmLimit=as.factor(HasKmLimit))%>%
                     mutate(Sedan=as.factor(VehBody == "sedan"))%>%
-                    select(-c(ClaimInd,RecordEnd, ClaimAmount,
+                    select(-c(RecordEnd, ClaimAmount,
                               Garage, Gender, MariStat,
                               SocioCateg, VehAge, VehPrice,
                               RiskVar, VehClass, VehBody,
-                              RecordBeg, Exposure))
+                              RecordBeg))
 
 freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150 km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
              "150-200 km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
@@ -65,19 +66,21 @@ freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150 km/h" = c("1-130 k
              "200+ km/h" = c("200-220 km/h","220+ km/h"))
 
 levels(freq_df$VehMaxSpeed)
-crosstab(freq_df, row.vars = "VehMaxSpeed", col.vars = "VehEnergy", type="f") 
 
+
+#We create the claim size data set
 
 claimsize_df <- freMPL1 %>%
                 filter(ClaimInd==1)%>%
                 mutate(LicAge = as.numeric(LicAge))%>%
                 mutate(HasKmLimit=as.factor(HasKmLimit))%>%
                 mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
+                mutate(DrivAge=as.numeric(DrivAge))%>%
                 mutate(Old=as.factor(VehAge=="10+"))%>%
                 filter(VehEnergy %in% c("regular","diesel"))%>%
-                droplevels()%>%
+                    droplevels()%>%
                 filter(!VehEngine %in% c("electric","GPL"))%>%
-                droplevels()%>%
+                    droplevels()%>%
                 mutate(Sedan=as.factor(VehBody == "sedan"))%>%
                 select(-c(ClaimInd,RecordEnd,
                         Gender, MariStat, SocioCateg,
@@ -92,4 +95,9 @@ claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150 km/h" = 
                                   "150-200 km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
                                                      "180-190 km/h","190-200 km/h"), 
                                   "200+ km/h" = c("200-220 km/h","220+ km/h"))
+
+
+
+  
+  
 
