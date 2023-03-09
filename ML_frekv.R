@@ -16,9 +16,7 @@ library(mlr3extralearners)
 
 df_mod1 <- freq_df %>%
   select(-ObsFreq) %>%
-    mutate(ClaimInd = as.factor(ClaimInd))%>%
-    mutate(BonusMalus = as.numeric(BonusMalus))%>%
-    mutate(DrivAge = as.numeric(DrivAge))
+    mutate(ClaimInd = as.factor(ClaimInd))
 
 task_mod1 <- as_task_classif(df_mod1, target = "ClaimInd")
 
@@ -83,6 +81,7 @@ df_mod2 <- df_mod2 %>%
   mutate("pred. freq." = ranger_tuned2$predict_newdata(df_mod2)$prob[,2])
 
 
-freq_df <- freq_df %>%
+
+final_df <- freq_df %>%
               mutate(Pred_freq_1 = df_mod1$`pred. freq. mod1`)%>%
               mutate(Pred_freq_2 = df_mod2$`pred. freq.`*freq_df$Exposure)

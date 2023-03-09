@@ -62,12 +62,13 @@ freq_df <- freMPL1 %>%
                               RiskVar, VehClass, VehBody,
                               RecordBeg))
 
-freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150 km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
-             "150-200 km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
+freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
+             "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
                                 "180-190 km/h","190-200 km/h"), 
-             "200+ km/h" = c("200-220 km/h","220+ km/h"))
+             "200plus_km/h" = c("200-220 km/h","220+ km/h"))
 
-
+dummy_df<-dummy_cols(freq_df, remove_selected_columns = TRUE)%>% 
+  dplyr::rename_all(list(~make.names(.)))
 
 #We create the claim size data set, same as frequency data apart from
 #line 76 and some of the removed variables in 89-92
@@ -94,13 +95,29 @@ claimsize_df <- freMPL1 %>%
 
 
   
-claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150 km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
-                                  "150-200 km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
+claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
+                                  "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
                                                      "180-190 km/h","190-200 km/h"), 
-                                  "200+ km/h" = c("200-220 km/h","220+ km/h"))
+                                  "200plus_km/h" = c("200-220 km/h","220+ km/h"))
 
 
 
+dummy_claim_df<-dummy_cols(claimsize_df, remove_selected_columns = TRUE)%>% 
+  dplyr::rename_all(list(~make.names(.)))
   
-  
+
+dummy_ClaimAmount <- freMPL1 %>%
+  mutate(ObsFreq=ClaimInd/Exposure)%>%
+  mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
+  mutate(Old=as.factor(VehAge=="10+"))%>%
+  filter(VehEnergy %in% c("regular","diesel"))%>%
+  droplevels()%>%
+  filter(!VehEngine %in% c("electric","GPL"))%>%
+  droplevels()%>%
+  mutate(LicAge = as.numeric(LicAge))%>%
+  mutate(HasKmLimit=as.factor(HasKmLimit))%>%
+  mutate(Sedan=as.factor(VehBody == "sedan"))%>%
+  mutate(BonusMalus = as.numeric(BonusMalus))%>%
+  mutate(DrivAge = as.numeric(DrivAge))%>%
+  select(ClaimAmount)
 
