@@ -121,3 +121,11 @@ dummy_ClaimAmount <- freMPL1 %>%
   mutate(DrivAge = as.numeric(DrivAge))%>%
   select(ClaimAmount)
 
+#Writing the datasets to .csv files
+source("Rasmus_Funktioner.R")
+WriteData(freq_df, "freq_df")
+WriteData(claimsize_df, "claimsize_df")
+
+
+
+
