@@ -18,14 +18,6 @@ data("freMPL1")
 freMPL1Claim <- subset(freMPL1, ClaimInd==1)
 summary(freMPL1Claim$ClaimAmount) #No zero claims
 
-#Recode SocioCateg such that the factor levels are monotonically ordered
-freMPL1 <- freMPL1 %>% 
-  mutate(SocioCateg = SocioCateg %>%
-           as.character() %>% 
-           map_chr(.f = substr, start = 4, stop = 999) %>% 
-           map_dbl(.f = as.numeric) %>% 
-           factor(levels = 1:100))
-
 ##### Exploratory Analysis - Freq model ######
 #Change "SocioCateg" to other variables.
 #For continuous vairbales, write floor(Var/100) or floor(Var/20) for grouping

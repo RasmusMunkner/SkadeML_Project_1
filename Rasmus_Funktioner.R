@@ -37,5 +37,32 @@ TreeModelGrouping <- function(.data, .feature, .target,
   
 }
 
+#Ensure that variables are of the correct type
+freMPL1 <- freMPL1 %>% 
+  mutate(SocioCateg = SocioCateg %>%
+           as.character() %>% 
+           map_chr(.f = substr, start = 4, stop = 999) %>% 
+           map_dbl(.f = as.numeric) %>% 
+           factor(levels = 1:100),
+         HasKmLimit = factor(HasKmLimit),
+         RiskVar = factor(RiskVar),
+         VehAge = fct_relevel(VehAge, "10+", after = 8))
+
+freMPL1 %>% str()
+
+# colnames(freMPL1 %>% select(-ClaimInd, -ClaimAmount)) %>% 
+#   map(.f = function(feature){
+#     
+#     if(is.factor(freMPL1[[feature]])){
+#       print(feature)
+#       freMPL1 %>% 
+#         group_by(!!rlang::sym(feature)) %>% 
+#         summarise(Frek = mean(ClaimInd)) %>% 
+#         ggplot(aes(x = !!rlang::sym(feature), y = Frek)) +
+#         geom_point() %>% return()
+#     }
+#     
+#   })
+
 #Hvis man kører hele dokumentet, skriver følgende linje, at man har gjort det. Bare for at gøre opmærksom.
 print("Sourced Rasmus_Funktioner.")
