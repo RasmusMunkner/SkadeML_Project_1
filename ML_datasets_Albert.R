@@ -3,7 +3,7 @@ library(dplyr)
 library(tidyverse)
 library(mlr3)
 library(lubridate)
-#source("http://pcwww.liv.ac.uk/~william/R/crosstab.r")
+source("http://pcwww.liv.ac.uk/~william/R/crosstab.r")
 #install.packages(c("xts", "sp", "zoo"))
 #install.packages("CASdatasets", repos = "http://cas.uqam.ca/pub/", type="source")
 #install.packages('gmodels')
@@ -54,6 +54,8 @@ freq_df <- freMPL1 %>%
                     mutate(LicAge = as.numeric(LicAge))%>%
                     mutate(HasKmLimit=as.factor(HasKmLimit))%>%
                     mutate(Sedan=as.factor(VehBody == "sedan"))%>%
+                    mutate(BonusMalus = as.numeric(BonusMalus))%>%
+                    mutate(DrivAge = as.numeric(DrivAge))%>%
                     select(-c(RecordEnd, ClaimAmount,
                               Garage, Gender, MariStat,
                               SocioCateg, VehAge, VehPrice,
@@ -65,29 +67,30 @@ freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150 km/h" = c("1-130 k
                                 "180-190 km/h","190-200 km/h"), 
              "200+ km/h" = c("200-220 km/h","220+ km/h"))
 
-levels(freq_df$VehMaxSpeed)
 
 
-#We create the claim size data set
+#We create the claim size data set, same as frequency data apart from
+#line 76 and some of the removed variables in 89-92
 
 claimsize_df <- freMPL1 %>%
                 filter(ClaimInd==1)%>%
-                mutate(LicAge = as.numeric(LicAge))%>%
-                mutate(HasKmLimit=as.factor(HasKmLimit))%>%
                 mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
-                mutate(DrivAge=as.numeric(DrivAge))%>%
                 mutate(Old=as.factor(VehAge=="10+"))%>%
                 filter(VehEnergy %in% c("regular","diesel"))%>%
-                    droplevels()%>%
+                droplevels()%>%
                 filter(!VehEngine %in% c("electric","GPL"))%>%
-                    droplevels()%>%
+                droplevels()%>%
+                mutate(LicAge = as.numeric(LicAge))%>%
+                mutate(HasKmLimit=as.factor(HasKmLimit))%>%
                 mutate(Sedan=as.factor(VehBody == "sedan"))%>%
-                select(-c(ClaimInd,RecordEnd,
-                        Gender, MariStat, SocioCateg,
-                        VehPrice,RiskVar,RecordBeg,
-                        VehClass, VehAge, VehPrice,
-                        BonusMalus, Exposure, VehBody))
-
+                mutate(BonusMalus = as.numeric(BonusMalus))%>%
+                mutate(DrivAge = as.numeric(DrivAge))%>%
+                select(-c(RecordEnd, ClaimAmount,
+                          Garage, Gender, MariStat,
+                          SocioCateg, VehAge, VehPrice,
+                          RiskVar, VehClass, VehBody,
+                          RecordBeg, Exposure, ClaimInd))
+              
 
 
   
