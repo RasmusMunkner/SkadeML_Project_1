@@ -80,3 +80,11 @@ claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150 km/h" = 
                                                      "180-190 km/h","190-200 km/h"), 
                                   "200+ km/h" = c("200-220 km/h","220+ km/h"))
 
+#Writing the datasets to .csv files
+source("Rasmus_Funktioner.R")
+WriteData(freq_df, "freq_df")
+WriteData(claimsize_df, "claimsize_df")
+
+
+
+

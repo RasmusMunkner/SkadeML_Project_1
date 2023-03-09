@@ -38,17 +38,17 @@ TreeModelGrouping <- function(.data, .feature, .target,
 }
 
 #Ensure that variables are of the correct type
-freMPL1 <- freMPL1 %>% 
-  mutate(SocioCateg = SocioCateg %>%
-           as.character() %>% 
-           map_chr(.f = substr, start = 4, stop = 999) %>% 
-           map_dbl(.f = as.numeric) %>% 
-           factor(levels = 1:100),
-         HasKmLimit = factor(HasKmLimit),
-         RiskVar = factor(RiskVar),
-         VehAge = fct_relevel(VehAge, "10+", after = 8))
-
-freMPL1 %>% str()
+# freMPL1 <- freMPL1 %>% 
+#   mutate(SocioCateg = SocioCateg %>%
+#            as.character() %>% 
+#            map_chr(.f = substr, start = 4, stop = 999) %>% 
+#            map_dbl(.f = as.numeric) %>% 
+#            factor(levels = 1:100),
+#          HasKmLimit = factor(HasKmLimit),
+#          RiskVar = factor(RiskVar),
+#          VehAge = fct_relevel(VehAge, "10+", after = 8))
+# 
+# freMPL1 %>% str()
 
 # colnames(freMPL1 %>% select(-ClaimInd, -ClaimAmount)) %>% 
 #   map(.f = function(feature){
@@ -64,5 +64,22 @@ freMPL1 %>% str()
 #     
 #   })
 
-#Hvis man kører hele dokumentet, skriver følgende linje, at man har gjort det. Bare for at gøre opmærksom.
-print("Sourced Rasmus_Funktioner.")
+
+#Convenience functions for saving and reading data
+#df is the dataset to be saved
+#name is the name of the dataset, e.g. it is saved as 'name.csv'
+#Hence valid input for name is "DataFreq", not "DataFreq.csv", since the .csv is automatically added.
+WriteData <- function(df, name){
+  write_csv(df, paste0(name, ".csv"))
+  df %>%
+    map_dfr(.f=pillar::type_sum) %>% 
+    write_csv(file = paste0(name, "_coltypes.csv"))
+}
+
+ReadData <- function(name){
+  read_csv(paste0(name, ".csv"),
+           col_types = read_csv(paste0(name, "_coltypes.csv")) %>%
+             unlist() %>%
+             map_chr(.f=substr, 0,1)
+           )
+}
