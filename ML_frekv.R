@@ -22,12 +22,21 @@ df_mod1 <- freq_df %>%
 
 task_mod1 <- as_task_classif(df_mod1, target = "ClaimInd")
 
+#Read in the data for the frequency model, filter out ObsFreq and convert to a MLR3 task.
+source("Rasmus_Funktioner.R") #For the ReadData-function
+task_mod1 <- ReadData("freq_df") %>% 
+  dplyr::select(-ObsFreq) %>%
+  as_task_classif(target = "ClaimInd")
+
+#It would be interesting to also tune over the number of trees we use for the model. I have the feeling that 50 are slightly few.
+#Also, mtry.ratio ~ 1 is probably much too large. We can most likely get better hyperparameters in fewer evals if we set it down to ~0.5 or lower.
 my_ranger_learner = lrn("classif.ranger",
                         mtry.ratio = to_tune(0.1,1),
                         min.node.size = to_tune(1, 50),
                         num.trees = 50,
                         predict_type= "prob")
 
+#For a final model, we should most likely set n_evals >> 10 or instead use a 'Clock_time' terminator.
 instance = tune(
   method = tnr("random_search"), ### tuning method
   task = task_mod1,
@@ -57,6 +66,10 @@ df_mod2 <- freq_df %>%
 
 task_mod2 <- as_task_classif(df_mod2, target = "ClaimInd")
 
+task_mod2 <- ReadData("freq_df") %>% 
+  dplyr::select(-Exposure, -ObsFreq) %>% 
+  as_task_classif(target = "ClaimInd")
+
 my_ranger_learner2 = lrn("classif.ranger",
                         mtry.ratio = to_tune(0.1,1),
                         min.node.size = to_tune(1, 50),
@@ -83,6 +96,7 @@ df_mod2 <- df_mod2 %>%
   mutate("pred. freq." = ranger_tuned2$predict_newdata(df_mod2)$prob[,2])
 
 
-freq_df <- freq_df %>%
-              mutate(Pred_freq_1 = df_mod1$`pred. freq. mod1`)%>%
-              mutate(Pred_freq_2 = df_mod2$`pred. freq.`*freq_df$Exposure)
+results <- ReadData("freq_df") %>%
+              add_column(Pred_freq_1 = ranger_tuned$predict_newdata(.)$prob[,2]) %>%
+              add_column(Pred_freq_2 = ranger_tuned2$predict_newdata(.)$prob[,2]) %>% 
+  select(ClaimInd, Pred_freq_1, Pred_freq_2)
