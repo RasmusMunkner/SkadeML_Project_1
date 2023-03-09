@@ -13,6 +13,7 @@ library(xts)
 library(zoo)
 library(forcats)
 library(CASdatasets)
+library(fastDummies)
 
 #Load the data into memory
 data("freMPL1")
@@ -44,8 +45,7 @@ freMPL1 %>%
 #Creating Frequency data
 
 freq_df <- freMPL1 %>%
-            mutate(ObsFreq=ClaimInd/Exposure,
-                   ClaimInd = factor(ClaimInd))%>%
+            mutate(ObsFreq=ClaimInd/Exposure)%>%
                   mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
                     mutate(Old=as.factor(VehAge=="10+"))%>%
                     filter(VehEnergy %in% c("regular","diesel"))%>%
@@ -55,11 +55,8 @@ freq_df <- freMPL1 %>%
                     mutate(LicAge = as.numeric(LicAge))%>%
                     mutate(HasKmLimit=as.factor(HasKmLimit))%>%
                     mutate(Sedan=as.factor(VehBody == "sedan"))%>%
-<<<<<<< HEAD
-=======
                     mutate(BonusMalus = as.numeric(BonusMalus))%>%
                     mutate(DrivAge = as.numeric(DrivAge))%>%
->>>>>>> 58b42a4cbd9d569a7b008d0bb9fd939402ba44dc
                     select(-c(RecordEnd, ClaimAmount,
                               Garage, Gender, MariStat,
                               SocioCateg, VehAge, VehPrice,
@@ -71,8 +68,9 @@ freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150_km/h" = c("1-130 k
                                 "180-190 km/h","190-200 km/h"), 
              "200plus_km/h" = c("200-220 km/h","220+ km/h"))
 
-dummy_df<-dummy_cols(freq_df, remove_selected_columns = TRUE)%>% 
-  dplyr::rename_all(list(~make.names(.)))
+freq_df<-dummy_cols(freq_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
+  dplyr::rename_all(list(~make.names(.))) %>% 
+  mutate(ClaimInd = factor(ClaimInd))
 
 #We create the claim size data set, same as frequency data apart from
 #line 76 and some of the removed variables in 89-92
@@ -106,7 +104,7 @@ claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150_km/h" = 
 
 
 
-dummy_claim_df<-dummy_cols(claimsize_df, remove_selected_columns = TRUE)%>% 
+claimsize_df<-dummy_cols(claimsize_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
   dplyr::rename_all(list(~make.names(.)))
   
 
