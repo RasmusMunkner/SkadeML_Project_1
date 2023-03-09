@@ -85,7 +85,7 @@ claimsize_df <- freMPL1 %>%
                 mutate(Sedan=as.factor(VehBody == "sedan"))%>%
                 mutate(BonusMalus = as.numeric(BonusMalus))%>%
                 mutate(DrivAge = as.numeric(DrivAge))%>%
-                select(-c(RecordEnd, ClaimAmount,
+                select(-c(RecordEnd,
                           Garage, Gender, MariStat,
                           SocioCateg, VehAge, VehPrice,
                           RiskVar, VehClass, VehBody,
