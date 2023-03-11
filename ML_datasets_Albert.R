@@ -49,7 +49,7 @@ freq_df <- freMPL1 %>%
   mutate(Cheap=as.factor(as.numeric(VehPrice)<13)) %>%
     mutate(Old=as.factor(VehAge=="10+")) %>%
     mutate(VehEnergy = fct_collapse(VehEnergy,
-                                    regular=c("regular", "electric", "GPL"))) %>% 
+                                    regular=c("regular", "eletric", "GPL"))) %>% 
     mutate(VehEngine = fct_collapse(VehEngine,
                                     injection=c("injection", "electric", "GPL"))) %>%
     mutate(LicAge = as.numeric(LicAge)) %>%
@@ -72,8 +72,7 @@ freq_df<-dummy_cols(freq_df, remove_selected_columns = TRUE, remove_first_dummy 
   dplyr::rename_all(list(~make.names(.))) %>% 
   mutate(ClaimInd = factor(ClaimInd))
 
-#We create the claim size data set, same as frequency data apart from
-#line 76 and some of the removed variables in 89-92
+#Now for the claim size dataset
 
 claimsize_df <- freMPL1 %>%
                 filter(ClaimInd==1)%>%
