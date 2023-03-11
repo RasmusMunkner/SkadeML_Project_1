@@ -3,7 +3,7 @@
 .Rapp.history
 
 # Session Data files
-.RData
+*.RData
 
 # User-specific files
 .Ruserdata
@@ -42,3 +42,6 @@ vignettes/*.pdf
 *.csv
 *.tsv
 *.txt
+
+# PDF output
+*.pdf
