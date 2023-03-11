@@ -22,7 +22,7 @@ data("freMPL1")
 #We make a series of crosstables between variables to get a feel
 #for the data
 crosstab(freMPL1, row.vars = "VehEngine", col.vars = "VehEnergy")  
-crosstab(freMPL1, row.vars = "VehEngine", col.vars = "ClaimInd")  
+crosstab(freMPL1, row.vars = "VehEngine", col.vars = "ClaimInd")
 crosstab(freMPL1, row.vars = "VehEngine", col.vars = "ClaimInd", type = "r")  
 crosstab(freMPL1, row.vars = "SocioCateg", col.vars = "ClaimInd", type = "r")  
 crosstab(freMPL1, row.vars = "SocioCateg", col.vars = "ClaimInd", type = "f")  
@@ -45,23 +45,23 @@ freMPL1 %>%
 #Creating Frequency data
 
 freq_df <- freMPL1 %>%
-            mutate(ObsFreq=ClaimInd/Exposure)%>%
-                  mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
-                    mutate(Old=as.factor(VehAge=="10+"))%>%
-                    filter(VehEnergy %in% c("regular","diesel"))%>%
-                        droplevels()%>%
-                    filter(!VehEngine %in% c("electric","GPL"))%>%
-                        droplevels()%>%
-                    mutate(LicAge = as.numeric(LicAge))%>%
-                    mutate(HasKmLimit=as.factor(HasKmLimit))%>%
-                    mutate(Sedan=as.factor(VehBody == "sedan"))%>%
-                    mutate(BonusMalus = as.numeric(BonusMalus))%>%
-                    mutate(DrivAge = as.numeric(DrivAge))%>%
-                    select(-c(RecordEnd, ClaimAmount,
-                              Garage, Gender, MariStat,
-                              SocioCateg, VehAge, VehPrice,
-                              RiskVar, VehClass, VehBody,
-                              RecordBeg))
+  mutate(ObsFreq=ClaimInd/Exposure) %>%
+  mutate(Cheap=as.factor(as.numeric(VehPrice)<13)) %>%
+    mutate(Old=as.factor(VehAge=="10+")) %>%
+    mutate(VehEnergy = fct_collapse(VehEnergy,
+                                    regular=c("regular", "electric", "GPL"))) %>% 
+    mutate(VehEngine = fct_collapse(VehEngine,
+                                    injection=c("injection", "electric", "GPL"))) %>%
+    mutate(LicAge = as.numeric(LicAge)) %>%
+    mutate(HasKmLimit=as.factor(HasKmLimit)) %>%
+    mutate(Sedan=as.factor(VehBody == "sedan")) %>%
+    mutate(BonusMalus = as.numeric(BonusMalus)) %>%
+    mutate(DrivAge = as.numeric(DrivAge)) %>%
+    select(-c(RecordEnd, ClaimAmount,
+              Garage, Gender, MariStat,
+              SocioCateg, VehAge, VehPrice,
+              RiskVar, VehClass, VehBody,
+              RecordBeg))
 
 freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
              "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
