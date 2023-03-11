@@ -46,6 +46,7 @@ freMPL1 %>%
 #Creating Frequency data
 ###########################################################################################
 
+#Old implementation
 freq_df <- freMPL1 %>%
   mutate(ObsFreq=ClaimInd/Exposure) %>%
   mutate(Cheap=as.factor(as.numeric(VehPrice)<13)) %>%
@@ -68,7 +69,12 @@ freq_df <- freMPL1 %>%
               SocioCateg, VehAge, VehPrice,
               RiskVar, VehClass, VehBody,
               RecordBeg))
+freq_df<-dummy_cols(freq_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
+  dplyr::rename_all(list(~make.names(.))) %>% 
+  mutate(ClaimInd = factor(ClaimInd))
 
+
+#New implementation
 lvl_pre <- "Group_"
 freq_df <- freMPL1 %>% 
   mutate(VehEnergy = fct_collapse(VehEnergy,
@@ -87,8 +93,10 @@ freq_df <- freMPL1 %>%
             RecordBeg)) %>% 
   TreeModelGrouping("VehAge", "ClaimInd", level_prefix = lvl_pre) %>% 
   TreeModelGrouping("VehBody", "ClaimInd", level_prefix = lvl_pre) %>% 
-  TreeModelGrouping("VehPrice", "ClaimInd", level_prefix = lvl_pre)
+  TreeModelGrouping("VehPrice", "ClaimInd", level_prefix = lvl_pre) %>% 
+  mutate(ClaimInd = factor(ClaimInd))
 
+#A nice plot
 freq_df %>%
   pivot_longer(cols = c(VehUsage, VehEngine, VehEnergy, VehMaxSpeed, VehClass, VehAge, VehBody, VehPrice),
                names_to = "factor",
@@ -101,10 +109,6 @@ freq_df %>%
   geom_errorbar(aes(ymin = freq - err, ymax = freq + err)) +
   theme(axis.text.x = element_text(angle = 90)) +
   facet_grid(~factor, scales ="free_x")
-
-freq_df<-dummy_cols(freq_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
-  dplyr::rename_all(list(~make.names(.))) %>% 
-  mutate(ClaimInd = factor(ClaimInd))
 
 ###########################################################################################
 #Claim size

@@ -11,7 +11,6 @@ source("Rasmus_Funktioner.R") #For the ReadData-function
 
 #Nu gør jeg præcist det, som jeg har rettet Albert for... Men det er smart, fordi jeg skal bruge det samme data flere gange...
 BaseData <- ReadData("freq_df") %>% 
-  dplyr::select(-ObsFreq) %>% 
   slice(sample(1:n())) #Shuffling the data set just to be sure CV folds are somewhat equally distributed
 
 task_mod1 <- BaseData %>% 
@@ -30,35 +29,39 @@ data_mod1_test <- BaseData %>%
 #####################################################################
 #Learners
 #####################################################################
+
+inner_tuner <- tnr("random_search")
+inner_resampling <- rsmp("cv", folds = 4)
+inner_terminator <- trm("evals", n_evals = 60)
+inner_measure <- msr("classif.bbrier")
+
 lrn_ranger_tmp = lrn("classif.ranger",
-                        mtry = to_tune(1,10), #Seems to matter, but not super clearly
+                        mtry.ratio = to_tune(0,1), #Seems to matter, but not super clearly
                         min.node.size = 50,
-                        num.trees = to_tune(50, 300), #Seems to be completely irrelevant
-                        max.depth = to_tune(2,30) #Something magical happens around 9 or 10, which may be where overfitting begins
+                        num.trees = to_tune(50, 500), #Seems to be completely irrelevant
+                        max.depth = to_tune(2,36) #Something magical happens around 9 or 10, which may be where overfitting begins
                         ,predict_type= "prob"
                         )
 
 lrn_ranger_auto <- auto_tuner(
-  method = tnr("random_search"),
+  method = inner_tuner,
   learner = lrn_ranger_tmp,
-  resampling = rsmp("cv", folds = 3),
-  measure = msr("classif.bbrier"),
-  terminator = trm("evals", n_evals = 30) #At least 20 evals should be needed - Probably way more for the final evaluation. Note that it is theoretically possible with too many (i think)
+  resampling = inner_resampling,
+  measure = inner_measure,
+  terminator = inner_terminator
 )
 
 lrn_logreg <- lrn("classif.log_reg", predict_type = "prob")
 
-lrn_rpart_tmp <- lrn("classif.rpart",
-                cp = to_tune(0.01, 1),
-                maxdepth = to_tune(2,30),
-                predict_type = "prob")
+lrn_rpart_tmp <- lts(lrn("classif.rpart",
+                         predict_type = "prob"))
 
 lrn_tree_auto <- auto_tuner(
-  method = tnr("random_search"),
+  method = inner_tuner,
   learner = lrn_rpart_tmp,
-  resampling = rsmp("cv", folds = 3),
-  measure = msr("classif.bbrier"),
-  terminator = trm("evals", n_evals = 30) #At least 20 evals should be needed - Probably way more for the final evaluation. Note that it is theoretically possible with too many (i think)
+  resampling = inner_resampling,
+  measure = inner_measure,
+  terminator = inner_terminator
 )
 
 lrn_baseline <- lrn("classif.featureless", predict_type = "prob")
@@ -84,84 +87,37 @@ lrn_baseline <- lrn("classif.featureless", predict_type = "prob")
 #Benchmark
 #####################################################################
 
-parallel::detectCores()
-
-
+parallel::detectCores() #Check the number of cores available on your machine, consider adjusting the number of outer folds to be a multiple of this number
 
 benchmark_design <- benchmark_grid(task_mod1,
                            list(rf = lrn_rf_auto, tree = lrn_tree_auto, logreg = lrn_logreg, baseline = lrn_baseline),
                            rsmp("cv", folds = 8))
 
-future::plan("multisession")
+future::plan("multisession") #Enables parallel computation
 benchmark_result <- benchmark_design %>% benchmark(store_models = T)
-future::plan("sequential")
+future::plan("sequential") #Disables parallel computation
 
+#Ordinary nested-CV error
+benchmark_result$aggregate(msr("classif.bbrier"))
+
+#Quantile-based error - Instead of performing an outer average, we consider quantiles.
+#This is more representative for the model performance in the bad cases
 benchmark_result$score(msr("classif.bbrier")) %>% 
   {tibble(learner = .$learner_id, OOSE = .$classif.bbrier)} %>% 
   group_by(learner) %>% 
   summarise(OOSE_quant = quantile(OOSE, 0.75))
 
-benchmark_result$aggregate(msr("classif.bbrier"))
-
 #####################################################################
 #Graphs
 #####################################################################
 
-
-
-
-#####################################################################
-#OLD
-#####################################################################
-
-outer_resampling = rsmp("cv", folds = 3)
-#nestedcvResults <- resample(task_mod1, lrn_ranger_auto, outer_resampling, store_models = T)
-
-#Results from each fold from the outer resampling
-nestedcvResults %>% 
-  extract_inner_tuning_results() %>% 
-  `[`(,list(iteration, max.depth, num.trees, mtry)) %>% 
-  as_tibble() %>% 
-  inner_join(nestedcvResults$score(msr("classif.bbrier"))[,list(iteration, classif.bbrier)] %>% as_tibble(), by = "iteration")
-
-archive <- nestedcvResults %>% extract_inner_tuning_archives()
-
-archive %>% `[`(,list(iteration, max.depth, num.trees, classif.bbrier)) %>% as_tibble() %>% 
-  ggplot(aes(x = num.trees, y = classif.bbrier, color = max.depth)) +
-  geom_point()
-
-archive %>% `[`(,list(iteration, max.depth, mtry, classif.bbrier)) %>% as_tibble() %>% 
-  ggplot(aes(x = max.depth, y = classif.bbrier, color = mtry %>% as.factor())) +
-  geom_point()
-
-ProposedModelPerformances <- 
-pmap_dbl(.l = list(mtry = archive$mtry, max.depth=archive$max.depth, num.trees = archive$num.trees),
-     .f = function(mtry, num.trees, max.depth){
-       forest <- lrn("classif.ranger",
-                     mtry = mtry, #Seems to matter, but not super clearly
-                     min.node.size = 50,
-                     num.trees = num.trees, #Seems to be completely irrelevant
-                     max.depth = max.depth #Something magical happens around 9 or 10, which may be where overfitting begins
-                     ,predict_type= "prob"
-       )
-       forest$train(task_mod1_train)
-       forest$predict_newdata(data_mod1_test)$score(msr("classif.bbrier"))
-     })
-
-ggplot(mapping = aes(x = test$max.depth, y = ProposedModelPerformances, color = test$mtry %>% as.factor())) +
-  geom_point() +
-  labs(x = "Max Depth", y = "Out of sample error (Brier Score)", color = "Mtry")
-
-#CV estimate for generalization error
-nestedcvResults$aggregate(msr("classif.bbrier"))
-
-#Train and test in holdout scenario
+#Train and test in holdout scenario to have something to plot
 lrn_ranger_auto$train(task_mod1_train)
+lrn_ranger_auto$predict(task_mod1)$score(msr("classif.bbrier"))
 lrn_ranger_auto$predict_newdata(data_mod1_test)$score(msr("classif.bbrier"))
 lrn_ranger_auto$learner$param_set
 
-#Visualisation
-
+#3d - Only for heuristics
 pred <- task_mod1 %>% 
   {cbind(`$`(., data)() %>% as_tibble(),
          auto_pred = lrn_ranger_auto$predict(.)$prob[,2])}
@@ -169,25 +125,43 @@ pred <- task_mod1 %>%
 plot3d(x = pred$Exposure, y = pred$LicAge, z = pred$auto_pred, col = pred$BonusMalus)
 plot3d(x = pred$LicAge, y = pred$DrivAge, z = pred$auto_pred)
 
-#Summarise results
+#2d
+results <- BaseData %>%
+  slice(train_index) %>% 
+  add_column(Pred_freq_at = lrn_ranger_auto$predict_newdata(.)$prob[,2]) #DONT USE THIS - It is for inspecting the performance on the training set
+results <- data_mod1_test %>%
+  add_column(Pred_freq_at = lrn_ranger_auto$predict_newdata(.)$prob[,2]) #Results on the test set
 
-newdata <- ReadData("freq_df")
-newdata <- data_mod1_test
+#Inspect how the estimated frequencies compare to the observed frequencies by factor level
+results %>%
+  pivot_longer(cols = c(VehUsage, VehEngine, VehEnergy, VehMaxSpeed, VehClass, VehAge, VehBody, VehPrice),
+               names_to = "factor",
+               values_to = "level") %>% 
+  group_by(factor, level) %>% 
+  mutate(ClaimInd = ClaimInd %>% as.character() %>% as.numeric()) %>% 
+  summarise(freq = mean(ClaimInd), err = sd(ClaimInd) / sqrt(n()) * 1.96, pred_freq = mean(Pred_freq_at)) %>% 
+  ggplot(aes(x = level)) +
+  geom_point(aes(y = freq)) +
+  geom_point(aes(y = pred_freq), color = "red") +
+  geom_errorbar(aes(ymin = freq - err, ymax = freq + err)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  facet_grid(~factor, scales ="free_x")
 
-results <- newdata %>%
-  add_column(Pred_freq_at = lrn_ranger_auto$predict_newdata(.)$prob[,2])
-
+#The classical exposure plot. Gives a decent indication of whether or not the model has managed to separate the data in an overfitting manner
 results %>% 
   ggplot(aes(x = Exposure, y = Pred_freq_at)) +
   geom_point(aes(color = ClaimInd)) +
   geom_smooth(method = "gam") +
   geom_smooth(method = "lm", color = "red")
 
+#Compare fitted frequencies for observations that have claims versus fitted frequencies for observations that do not have claims
 results %>% 
   group_by(ClaimInd) %>% 
   summarise(observedFreq = mean(ClaimInd %>% as.character() %>% as.numeric()), estFreq = mean(Pred_freq_at))
 
-#Permutation tests
+#####################################################################
+#Permutation tests - Somewhat unclear what we need this for
+#####################################################################
 task_mod1_permutation <- 
   ReadData("freq_df") %>%
   select(-ObsFreq) %>% 
