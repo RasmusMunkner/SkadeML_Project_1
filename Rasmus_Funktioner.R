@@ -6,7 +6,8 @@
 #predName - Navnet på kolonnen, som indeholder de prædikterede værdier for .target baseret på modellen
 #featureName - Navnet på kolonnen med den grupperede version af den kategoriske variabel - OBS: Den nye variabel kan ikke have samme navn som den gamle
 TreeModelGrouping <- function(.data, .feature, .target,
-                              predName = "Pred", featureName = NULL, maxdepth = 2, cp = 0){
+                              pred = F, predName = "Pred", featureName = NULL, level_prefix = "Group_", maxdepth = 2, cp = 0){
+  
   #Default er, at erstatte den ugrupperede variabel
   if(is.null(featureName)){
     featureName <- .feature
@@ -26,14 +27,24 @@ TreeModelGrouping <- function(.data, .feature, .target,
   if(.feature == featureName){
     .data <- .data %>% select(-.feature)
   }
+  
+  augmented_data <- 
   .data %>% 
     cbind(data.frame(
-      .pred = pred$response,
-      .featureName = pred$response %>% factor(labels = 1:length(unique(.)))
+      .pred = Pred$response,
+      .featureName = Pred$response %>% factor(labels = 1:length(unique(.)) %>% map_chr(.f=function(id){paste0(level_prefix,id)}))
     ) %>%
       setNames(c(predName, featureName))
-    ) %>% 
-    return()
+    )
+  
+  if(pred == F){
+    augmented_data %>% 
+      select(-predName) %>% 
+      return()
+  } else {
+    augmented_data %>% 
+      return()
+  }
   
 }
 

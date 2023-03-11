@@ -42,16 +42,22 @@ freMPL1 %>%
   summarise(avg = mean(ClaimInd))%>%
   print(n=37)
 
+###########################################################################################
 #Creating Frequency data
+###########################################################################################
 
 freq_df <- freMPL1 %>%
   mutate(ObsFreq=ClaimInd/Exposure) %>%
   mutate(Cheap=as.factor(as.numeric(VehPrice)<13)) %>%
     mutate(Old=as.factor(VehAge=="10+")) %>%
     mutate(VehEnergy = fct_collapse(VehEnergy,
-                                    regular=c("regular", "electric", "GPL"))) %>% 
+                                    regular=c("regular", "eletric", "GPL"))) %>% 
     mutate(VehEngine = fct_collapse(VehEngine,
-                                    injection=c("injection", "electric", "GPL"))) %>%
+                                    injection=c("injection", "electric", "GPL")),
+           VehMaxSpeed = fct_collapse(VehMaxSpeed, "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
+                                      "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
+                                                         "180-190 km/h","190-200 km/h"), 
+                                      "200plus_km/h" = c("200-220 km/h","220+ km/h"))) %>%
     mutate(LicAge = as.numeric(LicAge)) %>%
     mutate(HasKmLimit=as.factor(HasKmLimit)) %>%
     mutate(Sedan=as.factor(VehBody == "sedan")) %>%
@@ -63,17 +69,46 @@ freq_df <- freMPL1 %>%
               RiskVar, VehClass, VehBody,
               RecordBeg))
 
-freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
-             "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
-                                "180-190 km/h","190-200 km/h"), 
-             "200plus_km/h" = c("200-220 km/h","220+ km/h"))
+lvl_pre <- "Group_"
+freq_df <- freMPL1 %>% 
+  mutate(VehEnergy = fct_collapse(VehEnergy,
+                                  regular=c("regular", "eletric", "GPL")),
+         VehEngine = fct_collapse(VehEngine,
+                                  injection=c("injection", "electric", "GPL")),
+         VehMaxSpeed = fct_collapse(VehMaxSpeed,
+                                    "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
+                                    "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h","180-190 km/h","190-200 km/h"), 
+                                    "200plus_km/h" = c("200-220 km/h","220+ km/h")),
+         HasKmLimit = factor(HasKmLimit)) %>% 
+  select(-c(RecordEnd, ClaimAmount,
+            Garage, Gender, MariStat,
+            SocioCateg,
+            RiskVar,
+            RecordBeg)) %>% 
+  TreeModelGrouping("VehAge", "ClaimInd", level_prefix = lvl_pre) %>% 
+  TreeModelGrouping("VehBody", "ClaimInd", level_prefix = lvl_pre) %>% 
+  TreeModelGrouping("VehPrice", "ClaimInd", level_prefix = lvl_pre)
+
+freq_df %>%
+  pivot_longer(cols = c(VehUsage, VehEngine, VehEnergy, VehMaxSpeed, VehClass, VehAge, VehBody, VehPrice),
+               names_to = "factor",
+               values_to = "level") %>% 
+  group_by(factor, level) %>% 
+  mutate(ClaimInd = ClaimInd %>% as.character() %>% as.numeric()) %>% 
+  summarise(freq = mean(ClaimInd), err = sd(ClaimInd) / sqrt(n()) * 1.96) %>% 
+  ggplot(aes(x = level, y = freq)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = freq - err, ymax = freq + err)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  facet_grid(~factor, scales ="free_x")
 
 freq_df<-dummy_cols(freq_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
   dplyr::rename_all(list(~make.names(.))) %>% 
   mutate(ClaimInd = factor(ClaimInd))
 
-#We create the claim size data set, same as frequency data apart from
-#line 76 and some of the removed variables in 89-92
+###########################################################################################
+#Claim size
+###########################################################################################
 
 claimsize_df <- freMPL1 %>%
                 filter(ClaimInd==1)%>%

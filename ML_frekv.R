@@ -1,6 +1,8 @@
 library(mlr3verse)
+library(mlr3benchmark)
 library(mlr3mbo)
 library(mlr3extralearners)
+library(mlr3tuningspaces)
 library(tidyverse)
 library(rgl)
 source("Rasmus_Funktioner.R") #For the ReadData-function
@@ -25,67 +27,119 @@ task_mod1_train <- BaseData %>%
 data_mod1_test <- BaseData %>% 
   slice(test_index)
 
-
+#####################################################################
 #Learners
-my_ranger_learner = lrn("classif.ranger",
-                        mtry = to_tune(1,8), #Seems to matter, but not super clearly
-                        min.node.size = 150,
+#####################################################################
+lrn_ranger_tmp = lrn("classif.ranger",
+                        mtry = to_tune(1,10), #Seems to matter, but not super clearly
+                        min.node.size = 50,
                         num.trees = to_tune(50, 300), #Seems to be completely irrelevant
-                        max.depth = to_tune(2,24) #Something magical happens around 9 or 10, which may be where overfitting begins
+                        max.depth = to_tune(2,30) #Something magical happens around 9 or 10, which may be where overfitting begins
                         ,predict_type= "prob"
                         )
 
-#May not be best anymore
-my_current_best_ranger <- lrn("classif.ranger",
-                              mtry = 5, #Seems to matter, but not super clearly
-                              min.node.size = 150,
-                              num.trees = 158, #Seems to be completely irrelevant
-                              max.depth = 12 #Something magical happens around 9 or 10, which may be where overfitting begins
-                              ,predict_type= "prob"
-                              )
-
-My_long_ranger <- lrn("classif.ranger",
-                      mtry = 8, #Seems to matter, but not super clearly
-                      min.node.size = 150,
-                      num.trees = 71, #Seems to be completely irrelevant
-                      max.depth = 23 #Something magical happens around 9 or 10, which may be where overfitting begins
-                      ,predict_type= "prob"
-)
-
-my_ranger_learner_autotuner <- auto_tuner(
+lrn_ranger_auto <- auto_tuner(
   method = tnr("random_search"),
-  learner = my_ranger_learner,
-  resampling = rsmp("cv", folds = 8),
+  learner = lrn_ranger_tmp,
+  resampling = rsmp("cv", folds = 3),
   measure = msr("classif.bbrier"),
-  terminator = trm("evals", n_evals = 60) #At least 20 evals should be needed - Probably way more for the final evaluation. Note that it is theoretically possible with too many (i think)
+  terminator = trm("evals", n_evals = 30) #At least 20 evals should be needed - Probably way more for the final evaluation. Note that it is theoretically possible with too many (i think)
 )
 
-outer_resampling = rsmp("cv", folds = 5)
+lrn_logreg <- lrn("classif.log_reg", predict_type = "prob")
 
-#nestedcvResults <- resample(task_mod1, my_ranger_learner_autotuner, outer_resampling, store_models = T)
+lrn_rpart_tmp <- lrn("classif.rpart",
+                cp = to_tune(0.01, 1),
+                maxdepth = to_tune(2,30),
+                predict_type = "prob")
+
+lrn_tree_auto <- auto_tuner(
+  method = tnr("random_search"),
+  learner = lrn_rpart_tmp,
+  resampling = rsmp("cv", folds = 3),
+  measure = msr("classif.bbrier"),
+  terminator = trm("evals", n_evals = 30) #At least 20 evals should be needed - Probably way more for the final evaluation. Note that it is theoretically possible with too many (i think)
+)
+
+lrn_baseline <- lrn("classif.featureless", predict_type = "prob")
+
+#May not be best anymore
+# my_current_best_ranger <- lrn("classif.ranger",
+#                               mtry = 5, #Seems to matter, but not super clearly
+#                               min.node.size = 150,
+#                               num.trees = 158, #Seems to be completely irrelevant
+#                               max.depth = 12 #Something magical happens around 9 or 10, which may be where overfitting begins
+#                               ,predict_type= "prob"
+#                               )
+# 
+# My_long_ranger <- lrn("classif.ranger",
+#                       mtry = 8, #Seems to matter, but not super clearly
+#                       min.node.size = 150,
+#                       num.trees = 71, #Seems to be completely irrelevant
+#                       max.depth = 23 #Something magical happens around 9 or 10, which may be where overfitting begins
+#                       ,predict_type= "prob"
+# )
+
+#####################################################################
+#Benchmark
+#####################################################################
+
+parallel::detectCores()
+
+
+
+benchmark_design <- benchmark_grid(task_mod1,
+                           list(rf = lrn_rf_auto, tree = lrn_tree_auto, logreg = lrn_logreg, baseline = lrn_baseline),
+                           rsmp("cv", folds = 8))
+
+future::plan("multisession")
+benchmark_result <- benchmark_design %>% benchmark(store_models = T)
+future::plan("sequential")
+
+benchmark_result$score(msr("classif.bbrier")) %>% 
+  {tibble(learner = .$learner_id, OOSE = .$classif.bbrier)} %>% 
+  group_by(learner) %>% 
+  summarise(OOSE_quant = quantile(OOSE, 0.75))
+
+benchmark_result$aggregate(msr("classif.bbrier"))
+
+#####################################################################
+#Graphs
+#####################################################################
+
+
+
+
+#####################################################################
+#OLD
+#####################################################################
+
+outer_resampling = rsmp("cv", folds = 3)
+#nestedcvResults <- resample(task_mod1, lrn_ranger_auto, outer_resampling, store_models = T)
 
 #Results from each fold from the outer resampling
 nestedcvResults %>% 
   extract_inner_tuning_results() %>% 
-  `[`(,list(iteration, max.depth, num.trees)) %>% 
+  `[`(,list(iteration, max.depth, num.trees, mtry)) %>% 
   as_tibble() %>% 
   inner_join(nestedcvResults$score(msr("classif.bbrier"))[,list(iteration, classif.bbrier)] %>% as_tibble(), by = "iteration")
 
-test <- nestedcvResults %>% extract_inner_tuning_archives()
+archive <- nestedcvResults %>% extract_inner_tuning_archives()
 
-test %>% `[`(,list(iteration, max.depth, num.trees, classif.bbrier)) %>% as_tibble() %>% 
+archive %>% `[`(,list(iteration, max.depth, num.trees, classif.bbrier)) %>% as_tibble() %>% 
   ggplot(aes(x = num.trees, y = classif.bbrier, color = max.depth)) +
   geom_point()
 
-test %>% `[`(,list(iteration, max.depth, num.trees, classif.bbrier)) %>% as_tibble() %>% 
-  ggplot(aes(x = max.depth, y = classif.bbrier, color = iteration %>% as.factor())) +
+archive %>% `[`(,list(iteration, max.depth, mtry, classif.bbrier)) %>% as_tibble() %>% 
+  ggplot(aes(x = max.depth, y = classif.bbrier, color = mtry %>% as.factor())) +
   geom_point()
 
-pmap_dbl(.l = list(mtry = test$mtry, num.trees = test$num.trees, max.depth=test$max.depth),
+ProposedModelPerformances <- 
+pmap_dbl(.l = list(mtry = archive$mtry, max.depth=archive$max.depth, num.trees = archive$num.trees),
      .f = function(mtry, num.trees, max.depth){
        forest <- lrn("classif.ranger",
                      mtry = mtry, #Seems to matter, but not super clearly
-                     min.node.size = 150,
+                     min.node.size = 50,
                      num.trees = num.trees, #Seems to be completely irrelevant
                      max.depth = max.depth #Something magical happens around 9 or 10, which may be where overfitting begins
                      ,predict_type= "prob"
@@ -94,39 +148,23 @@ pmap_dbl(.l = list(mtry = test$mtry, num.trees = test$num.trees, max.depth=test$
        forest$predict_newdata(data_mod1_test)$score(msr("classif.bbrier"))
      })
 
-ContenderModels <- .Last.value
-
-ggplot(mapping = aes(x = test$max.depth, y = ContenderModels, color = test$mtry %>% as.factor())) +
+ggplot(mapping = aes(x = test$max.depth, y = ProposedModelPerformances, color = test$mtry %>% as.factor())) +
   geom_point() +
   labs(x = "Max Depth", y = "Out of sample error (Brier Score)", color = "Mtry")
-
-test %>%
-  as_tibble() %>%
-  filter(max.depth == 2) %>% 
-  filter(classif.bbrier == min(classif.bbrier))
 
 #CV estimate for generalization error
 nestedcvResults$aggregate(msr("classif.bbrier"))
 
 #Train and test in holdout scenario
-my_ranger_learner_autotuner$train(task_mod1_train)
-my_ranger_learner_autotuner$predict_newdata(data_mod1_test)$score(msr("classif.bbrier"))
-my_ranger_learner_autotuner$learner$param_set
-
-#Compare to the low depth best learner
-my_current_best_ranger$train(task_mod1_train)
-my_current_best_ranger$predict_newdata(data_mod1_test)$score(msr("classif.bbrier"))
-
-#Compare to a featureless learner
-lrn_featureless <- lrn("classif.featureless", predict_type = "prob")
-lrn_featureless$train(task_mod1)
-lrn_featureless$predict(task_mod1)$score(msr("classif.bbrier"))
+lrn_ranger_auto$train(task_mod1_train)
+lrn_ranger_auto$predict_newdata(data_mod1_test)$score(msr("classif.bbrier"))
+lrn_ranger_auto$learner$param_set
 
 #Visualisation
 
 pred <- task_mod1 %>% 
   {cbind(`$`(., data)() %>% as_tibble(),
-         auto_pred = my_ranger_learner_autotuner$predict(.)$prob[,2])}
+         auto_pred = lrn_ranger_auto$predict(.)$prob[,2])}
 
 plot3d(x = pred$Exposure, y = pred$LicAge, z = pred$auto_pred, col = pred$BonusMalus)
 plot3d(x = pred$LicAge, y = pred$DrivAge, z = pred$auto_pred)
@@ -137,17 +175,10 @@ newdata <- ReadData("freq_df")
 newdata <- data_mod1_test
 
 results <- newdata %>%
-  add_column(Pred_freq_at = my_ranger_learner_autotuner$predict_newdata(.)$prob[,2],
-             Pred_freq_best = my_current_best_ranger$predict_newdata(.)$prob[,2])
+  add_column(Pred_freq_at = lrn_ranger_auto$predict_newdata(.)$prob[,2])
 
 results %>% 
   ggplot(aes(x = Exposure, y = Pred_freq_at)) +
-  geom_point(aes(color = ClaimInd)) +
-  geom_smooth(method = "gam") +
-  geom_smooth(method = "lm", color = "red")
-
-results %>% 
-  ggplot(aes(x = Exposure, y = Pred_freq_best)) +
   geom_point(aes(color = ClaimInd)) +
   geom_smooth(method = "gam") +
   geom_smooth(method = "lm", color = "red")
