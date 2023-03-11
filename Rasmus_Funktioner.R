@@ -78,7 +78,7 @@ WriteData <- function(df, name){
 
 ReadData <- function(name){
   read_csv(paste0(name, ".csv"),
-           col_types = read_csv(paste0(name, "_coltypes.csv")) %>%
+           col_types = read_csv(paste0(name, "_coltypes.csv"), show_col_types = F) %>%
              unlist() %>%
              map_chr(.f=substr, 0,1)
            )

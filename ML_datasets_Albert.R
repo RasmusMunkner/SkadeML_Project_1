@@ -13,6 +13,7 @@ library(xts)
 library(zoo)
 library(forcats)
 library(CASdatasets)
+library(fastDummies)
 
 #Load the data into memory
 data("freMPL1")
@@ -67,8 +68,9 @@ freq_df$VehMaxSpeed<-fct_collapse(freq_df$VehMaxSpeed, "1-150_km/h" = c("1-130 k
                                 "180-190 km/h","190-200 km/h"), 
              "200plus_km/h" = c("200-220 km/h","220+ km/h"))
 
-dummy_df<-dummy_cols(freq_df, remove_selected_columns = TRUE)%>% 
-  dplyr::rename_all(list(~make.names(.)))
+freq_df<-dummy_cols(freq_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
+  dplyr::rename_all(list(~make.names(.))) %>% 
+  mutate(ClaimInd = factor(ClaimInd))
 
 #We create the claim size data set, same as frequency data apart from
 #line 76 and some of the removed variables in 89-92
@@ -102,7 +104,7 @@ claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150_km/h" = 
 
 
 
-dummy_claim_df<-dummy_cols(claimsize_df, remove_selected_columns = TRUE)%>% 
+claimsize_df<-dummy_cols(claimsize_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
   dplyr::rename_all(list(~make.names(.)))
   
 
@@ -125,7 +127,4 @@ dummy_ClaimAmount <- freMPL1 %>%
 source("Rasmus_Funktioner.R")
 WriteData(freq_df, "freq_df")
 WriteData(claimsize_df, "claimsize_df")
-
-
-
 
