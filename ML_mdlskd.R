@@ -3,12 +3,14 @@ library(mlr3benchmark)
 library(mlr3mbo)
 library(mlr3extralearners)
 library(mlr3tuningspaces)
+library(mlr3tuning)
 library(tidyverse)
 library(rgl)
 library(stats)
 library(ranger)
 library(kknn)
 library(glmnet)
+library(xgboost)
 library(mlr3measures)
 source("Rasmus_Funktioner.R") #For the ReadData-function
 
@@ -35,9 +37,9 @@ data_mod1_test <- BaseData %>%
 #Learners
 #####################################################################
 
-inner_tuner <- tnr("random_search")
+inner_tuner <- mlr3tuning::tnr("mbo")
 inner_resampling <- rsmp("cv", folds = 6)
-inner_terminator <- trm("evals", n_evals = 50)
+inner_terminator <- trm("evals", n_evals = 75)
 inner_measure <- msr("regr.msle")
 
 lrn_ranger_tmp = lts(lrn("regr.ranger"))
@@ -50,7 +52,7 @@ lrn_ranger_auto <- auto_tuner(
   terminator = inner_terminator
 )
 
-lrn_glmnet_tmp <- lts(lrn("regr.glmnet"))
+lrn_glmnet_tmp <- lts(lrn("regr.glmnet", family = "poisson"))
 
 lrn_glmnet_auto <- auto_tuner(
   method = inner_tuner,
@@ -59,6 +61,17 @@ lrn_glmnet_auto <- auto_tuner(
   measure = inner_measure,
   terminator = inner_terminator
 )
+
+lrn_xgboost_tmp <- lts(lrn("regr.xgboost"))
+
+lrn_xgboost_auto <- auto_tuner(
+  method = inner_tuner,
+  learner = lrn_xgboost_tmp,
+  resampling = inner_resampling,
+  measure = inner_measure,
+  terminator = inner_terminator
+)
+
 
 lrn_baseline <- lrn("regr.featureless")
 
@@ -101,9 +114,16 @@ parallel::detectCores() #Check the number of cores available on your machine, co
 benchmark_design <- benchmark_grid(task_mod1,
                            list(rf = lrn_ranger_auto, 
                                 kkn = lrn_knn_auto,
+                                glmnet = lrn_glmnet_auto,
                                 lm = lrn_lm, 
                                 baseline = lrn_baseline),
-                           rsmp("cv", folds = 8))
+                           rsmp("cv", folds = 5))
+
+#benchmark_design <- benchmark_grid(task_mod1,
+                                   #list(xgb = lrn_xgboost_auto,
+                                    #baseline = lrn_baseline),
+                                   #rsmp("cv", folds = 4))
+
 
 future::plan("multisession") #Enables parallel computation
 benchmark_result <- benchmark_design %>% benchmark(store_models = T)
