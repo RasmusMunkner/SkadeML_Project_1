@@ -31,14 +31,14 @@ data_mod1_test <- BaseData %>%
 #####################################################################
 
 inner_tuner <- tnr("random_search")
-inner_resampling <- rsmp("cv", folds = 4)
+inner_resampling <- rsmp("cv", folds = 5)
 inner_terminator <- trm("evals", n_evals = 60)
 inner_measure <- msr("classif.bbrier")
 
 lrn_ranger_tmp = lrn("classif.ranger",
-                        mtry.ratio = to_tune(0,1), #Seems to matter, but not super clearly
+                        mtry.ratio = to_tune(0,0.5), #Seems to matter, but not super clearly
                         min.node.size = 50,
-                        num.trees = to_tune(50, 500), #Seems to be completely irrelevant
+                        num.trees = to_tune(50, 200), #Seems to be completely irrelevant
                         max.depth = to_tune(2,36) #Something magical happens around 9 or 10, which may be where overfitting begins
                         ,predict_type= "prob"
                         )
@@ -90,7 +90,7 @@ lrn_baseline <- lrn("classif.featureless", predict_type = "prob")
 parallel::detectCores() #Check the number of cores available on your machine, consider adjusting the number of outer folds to be a multiple of this number
 
 benchmark_design <- benchmark_grid(task_mod1,
-                           list(rf = lrn_rf_auto, tree = lrn_tree_auto, logreg = lrn_logreg, baseline = lrn_baseline),
+                           list(rf = lrn_ranger_auto, tree = lrn_tree_auto, logreg = lrn_logreg, baseline = lrn_baseline),
                            rsmp("cv", folds = 8))
 
 future::plan("multisession") #Enables parallel computation

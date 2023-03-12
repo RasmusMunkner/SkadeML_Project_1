@@ -14,6 +14,7 @@ library(zoo)
 library(forcats)
 library(CASdatasets)
 library(fastDummies)
+source("Rasmus_Funktioner.R")
 
 #Load the data into memory
 data("freMPL1")
@@ -48,6 +49,7 @@ freMPL1 %>%
 
 #Old implementation
 freq_df <- freMPL1 %>%
+  distinct() %>% 
   mutate(ObsFreq=ClaimInd/Exposure) %>%
   mutate(Cheap=as.factor(as.numeric(VehPrice)<13)) %>%
     mutate(Old=as.factor(VehAge=="10+")) %>%
@@ -115,6 +117,7 @@ freq_df %>%
 ###########################################################################################
 
 claimsize_df <- freMPL1 %>%
+                distinct() %>% 
                 filter(ClaimInd==1)%>%
                 mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
                 mutate(Old=as.factor(VehAge=="10+"))%>%
