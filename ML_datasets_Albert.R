@@ -43,6 +43,23 @@ freMPL1 %>%
   summarise(avg = mean(ClaimInd))%>%
   print(n=37)
 
+#Claim ID base
+freMPL1 %>% 
+  summarise(claimInd=mean(ClaimInd))
+
+#Claim ID without duplicates
+freMPL1 %>% 
+  distinct() %>% 
+  summarise(claimInd=mean(ClaimInd))
+
+#Claid ID with only removing if ClaimInd > 0
+freMPL1 %>% 
+  add_column(rand = rnorm(nrow(.))) %>% 
+  mutate(duplicateGuess = case_when(ClaimInd == 0 ~ rand, ClaimInd == 1 ~ 0)) %>% 
+  select(-rand) %>% 
+  distinct() %>% 
+  summarise(claimInd=mean(ClaimInd))
+
 ###########################################################################################
 #Creating Frequency data
 ###########################################################################################
@@ -77,7 +94,6 @@ freq_df<-dummy_cols(freq_df, remove_selected_columns = TRUE, remove_first_dummy 
 
 
 #New implementation
-lvl_pre <- "Group_"
 freq_df <- freMPL1 %>% 
   mutate(VehEnergy = fct_collapse(VehEnergy,
                                   regular=c("regular", "eletric", "GPL")),
@@ -93,9 +109,9 @@ freq_df <- freMPL1 %>%
             SocioCateg,
             RiskVar,
             RecordBeg)) %>% 
-  TreeModelGrouping("VehAge", "ClaimInd", level_prefix = lvl_pre) %>% 
-  TreeModelGrouping("VehBody", "ClaimInd", level_prefix = lvl_pre) %>% 
-  TreeModelGrouping("VehPrice", "ClaimInd", level_prefix = lvl_pre) %>% 
+  TreeModelGrouping("VehAge", "ClaimInd") %>% 
+  TreeModelGrouping("VehBody", "ClaimInd") %>% 
+  TreeModelGrouping("VehPrice", "ClaimInd") %>% 
   mutate(ClaimInd = factor(ClaimInd))
 
 #A nice plot
@@ -112,38 +128,44 @@ freq_df %>%
   theme(axis.text.x = element_text(angle = 90)) +
   facet_grid(~factor, scales ="free_x")
 
+#Plot for tree-grouped factors
+freq_df %>%
+  pivot_longer(cols = c(VehAge, VehBody, VehPrice),
+               names_to = "factor",
+               values_to = "level") %>% 
+  group_by(factor, level) %>% 
+  mutate(ClaimInd = ClaimInd %>% as.character() %>% as.numeric()) %>% 
+  summarise(freq = mean(ClaimInd), err = sd(ClaimInd) / sqrt(n()) * 1.96) %>% 
+  ggplot(aes(x = level, y = freq)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = freq - err, ymax = freq + err)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  facet_grid(~factor, scales ="free_x")
+
 ###########################################################################################
 #Claim size
 ###########################################################################################
 
 claimsize_df <- freMPL1 %>%
-                distinct() %>% 
-                filter(ClaimInd==1)%>%
-                mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
-                mutate(Old=as.factor(VehAge=="10+"))%>%
-                filter(VehEnergy %in% c("regular","diesel"))%>%
-                droplevels()%>%
-                filter(!VehEngine %in% c("electric","GPL"))%>%
-                droplevels()%>%
-                mutate(LicAge = as.numeric(LicAge))%>%
-                mutate(HasKmLimit=as.factor(HasKmLimit))%>%
-                mutate(Sedan=as.factor(VehBody == "sedan"))%>%
-                mutate(BonusMalus = as.numeric(BonusMalus))%>%
-                mutate(DrivAge = as.numeric(DrivAge))%>%
-                select(-c(RecordEnd,
-                          Garage, Gender, MariStat,
-                          SocioCateg, VehAge, VehPrice,
-                          RiskVar, VehClass, VehBody,
-                          RecordBeg, Exposure, ClaimInd))
-              
-
-
-  
-claimsize_df$VehMaxSpeed<-fct_collapse(claimsize_df$VehMaxSpeed, "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
-                                  "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h",
-                                                     "180-190 km/h","190-200 km/h"), 
-                                  "200plus_km/h" = c("200-220 km/h","220+ km/h"))
-
+  distinct() %>% 
+  filter(ClaimInd==1)%>%
+  mutate(Cheap=as.factor(as.numeric(VehPrice)<13))%>%
+  mutate(Old=as.factor(VehAge=="10+"))%>%
+  mutate(Sedan=as.factor(VehBody == "sedan"))%>%
+  mutate(VehEnergy = fct_collapse(VehEnergy,
+                                  regular=c("regular", "eletric", "GPL")),
+         VehEngine = fct_collapse(VehEngine,
+                                  injection=c("injection", "electric", "GPL")),
+         VehMaxSpeed = fct_collapse(VehMaxSpeed,
+                                    "1-150_km/h" = c("1-130 km/h", "130-140 km/h", "140-150 km/h"),
+                                    "150-200_km/h" = c("150-160 km/h","160-170 km/h","170-180 km/h","180-190 km/h","190-200 km/h"), 
+                                    "200plus_km/h" = c("200-220 km/h","220+ km/h")),
+         HasKmLimit = factor(HasKmLimit)) %>% 
+  select(-c(RecordEnd,
+            Garage, Gender, MariStat,
+            SocioCateg, VehAge, VehPrice,
+            RiskVar, VehClass, VehBody,
+            RecordBeg, Exposure, ClaimInd))
 
 
 claimsize_df<-dummy_cols(claimsize_df, remove_selected_columns = TRUE, remove_first_dummy = T)%>% 
