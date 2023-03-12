@@ -13,6 +13,7 @@ source("Rasmus_Funktioner.R") #For the ReadData-function
 BaseData <- ReadData("freq_df") %>% 
   slice(sample(1:n())) #Shuffling the data set just to be sure CV folds are somewhat equally distributed
 
+#Convert to MLR3 task
 task_mod1 <- BaseData %>% 
   as_task_classif(target = "ClaimInd", measure = "classif.bbrier")
 
@@ -31,7 +32,7 @@ data_mod1_test <- BaseData %>%
 #####################################################################
 
 inner_tuner <- tnr("random_search")
-inner_resampling <- rsmp("cv", folds = 5)
+inner_resampling <- rsmp("cv", folds = 4)
 inner_terminator <- trm("evals", n_evals = 60)
 inner_measure <- msr("classif.bbrier")
 
@@ -66,23 +67,6 @@ lrn_tree_auto <- auto_tuner(
 
 lrn_baseline <- lrn("classif.featureless", predict_type = "prob")
 
-#May not be best anymore
-# my_current_best_ranger <- lrn("classif.ranger",
-#                               mtry = 5, #Seems to matter, but not super clearly
-#                               min.node.size = 150,
-#                               num.trees = 158, #Seems to be completely irrelevant
-#                               max.depth = 12 #Something magical happens around 9 or 10, which may be where overfitting begins
-#                               ,predict_type= "prob"
-#                               )
-# 
-# My_long_ranger <- lrn("classif.ranger",
-#                       mtry = 8, #Seems to matter, but not super clearly
-#                       min.node.size = 150,
-#                       num.trees = 71, #Seems to be completely irrelevant
-#                       max.depth = 23 #Something magical happens around 9 or 10, which may be where overfitting begins
-#                       ,predict_type= "prob"
-# )
-
 #####################################################################
 #Benchmark
 #####################################################################
@@ -98,14 +82,20 @@ benchmark_result <- benchmark_design %>% benchmark(store_models = T)
 future::plan("sequential") #Disables parallel computation
 
 #Ordinary nested-CV error
-benchmark_result$aggregate(msr("classif.bbrier"))
+benchmark_mean <- 
+benchmark_result$aggregate(msrs(list("classif.bbrier", "classif.logloss", "classif.auc"))) %>% 
+  rename(learner = learner_id) %>% 
+  select(learner, classif.bbrier, classif.logloss, classif.auc)
 
-#Quantile-based error - Instead of performing an outer average, we consider quantiles.
-#This is more representative for the model performance in the bad cases
+#Quantile-based error
+benchmark_quant <- 
 benchmark_result$score(msr("classif.bbrier")) %>% 
-  {tibble(learner = .$learner_id, OOSE = .$classif.bbrier)} %>% 
+  {tibble(learner = .$learner_id, bbrier = .$classif.bbrier)} %>% 
   group_by(learner) %>% 
-  summarise(OOSE_quant = quantile(OOSE, 0.75))
+  summarise(bbrier.max = max(bbrier))
+
+benchmark_mean %>% 
+  inner_join(benchmark_quant, by = "learner")
 
 #####################################################################
 #Graphs
@@ -152,7 +142,8 @@ results %>%
   ggplot(aes(x = Exposure, y = Pred_freq_at)) +
   geom_point(aes(color = ClaimInd)) +
   geom_smooth(method = "gam") +
-  geom_smooth(method = "lm", color = "red")
+  geom_smooth(method = "lm", color = "red") +
+  ylab("Predicted Frequency")
 
 #Compare fitted frequencies for observations that have claims versus fitted frequencies for observations that do not have claims
 results %>% 
