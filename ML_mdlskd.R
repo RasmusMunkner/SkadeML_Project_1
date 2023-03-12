@@ -5,8 +5,11 @@ library(mlr3extralearners)
 library(mlr3tuningspaces)
 library(tidyverse)
 library(rgl)
+library(stats)
 library(ranger)
+library(kknn)
 library(glmnet)
+library(mlr3measures)
 source("Rasmus_Funktioner.R") #For the ReadData-function
 
 #Read in the data for the frequency model, filter out ObsFreq and convert to a MLR3 task.
@@ -33,15 +36,11 @@ data_mod1_test <- BaseData %>%
 #####################################################################
 
 inner_tuner <- tnr("random_search")
-inner_resampling <- rsmp("cv", folds = 5)
-inner_terminator <- trm("evals", n_evals = 30)
-inner_measure <- msr("regr.mse")
+inner_resampling <- rsmp("cv", folds = 3)
+inner_terminator <- trm("evals", n_evals = 10)
+inner_measure <- msr("regr.msle")
 
-lrn_ranger_tmp = lrn("regr.ranger",
-                        mtry.ratio = to_tune(0,0.5), #Seems to matter, but not super clearly
-                        min.node.size = 50,
-                        num.trees = to_tune(50, 200), #Seems to be completely irrelevant
-                        max.depth = to_tune(2,36))
+lrn_ranger_tmp = lts(lrn("regr.ranger"))
 
 lrn_ranger_auto <- auto_tuner(
   method = inner_tuner,
@@ -51,9 +50,7 @@ lrn_ranger_auto <- auto_tuner(
   terminator = inner_terminator
 )
 
-lrn_glmnet_tmp <- lts(lrn("regr.glmnet"),
-                      s= to_tune(0, 1),
-                      alpha=to_tune(0, 1))
+lrn_glmnet_tmp <- lts(lrn("regr.glmnet"))
 
 lrn_glmnet_auto <- auto_tuner(
   method = inner_tuner,
@@ -65,15 +62,7 @@ lrn_glmnet_auto <- auto_tuner(
 
 lrn_baseline <- lrn("regr.featureless")
 
-lrn_lm_tmp <- lts(lrn("regr.lm"))
-
-lrn_lm_auto <- auto_tuner(
-  method = inner_tuner,
-  learner = lrn_lm_tmp,
-  resampling = inner_resampling,
-  measure = inner_measure,
-  terminator = inner_terminator
-)
+lrn_lm <- lrn("regr.lm")
 
 lrn_knn_tmp <- lts(lrn("regr.kknn"))
 
@@ -110,22 +99,26 @@ lrn_knn_auto <- auto_tuner(
 parallel::detectCores() #Check the number of cores available on your machine, consider adjusting the number of outer folds to be a multiple of this number
 
 benchmark_design <- benchmark_grid(task_mod1,
-                           list(rf = lrn_ranger_auto, glmnet = lrn_glmnet_auto, logreg = lrn_logreg, baseline = lrn_baseline),
-                           rsmp("cv", folds = 8))
+                           list(rf = lrn_ranger_auto, 
+                                glmnet = lrn_glmnet_auto, 
+                                kkn = lrn_knn_auto,
+                                lm = lrn_lm, 
+                                baseline = lrn_baseline),
+                           rsmp("cv", folds = 3))
 
 future::plan("multisession") #Enables parallel computation
 benchmark_result <- benchmark_design %>% benchmark(store_models = T)
 future::plan("sequential") #Disables parallel computation
 
 #Ordinary nested-CV error
-benchmark_result$aggregate(msr("classif.bbrier"))
+benchmark_result$aggregate(msr("regr.rmse"))
 
 #Quantile-based error - Instead of performing an outer average, we consider quantiles.
 #This is more representative for the model performance in the bad cases
-benchmark_result$score(msr("classif.bbrier")) %>% 
-  {tibble(learner = .$learner_id, OOSE = .$classif.bbrier)} %>% 
+benchmark_result$score(msr("regr.rmse")) %>% 
+  {tibble(learner = .$learner_id, RMSE = .$regr.rmse)} %>% 
   group_by(learner) %>% 
-  summarise(OOSE_quant = quantile(OOSE, 0.75))
+  summarise(RMSE_mean = mean(RMSE))
 
 #####################################################################
 #Graphs
