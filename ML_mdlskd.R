@@ -234,4 +234,30 @@ y <- PermutationTest(rflearner,
 rflearner$train(task_mod1)
 rflearner$predict(task_mod1)$score()
 
+####################################################
+#Test scenario with artifical effect
+####################################################
+RedTask <- 
+  freMPL1 %>%
+  filter(ClaimInd == 1) %>% 
+  mutate(RegEnergy = (VehEnergy == "regular")) %>% 
+  mutate(ClaimAmount = ClaimAmount * (1 - (RegEnergy == 1) / 10 * 9)) %>% 
+  select(RegEnergy, ClaimAmount) %>% 
+  as_task_regr(target = "ClaimAmount")
+
+lrn_lm$train(RedTask)
+lrn_lm$predict(RedTask)$score(msr("regr.rmse"))
+lrn_lm$predict_newdata(data_mod1_test)$score(msr("regr.rmse"))
+
+lrn_simple <- lrn("regr.rpart")
+
+Red_Benchmark <- benchmark_grid(RedTask,
+                                list(featureless = lrn_baseline, glmnet = lrn_glmnet_simple),
+                                rsmp("cv", folds = 12))
+
+Red_benchmark_result <- Red_Benchmark %>% benchmark(store_models = T)
+
+
+Red_benchmark_result$score(msr("regr.rmse"))
+Red_benchmark_result$aggregate(msr("regr.rmse"))
 
