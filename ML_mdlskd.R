@@ -36,8 +36,8 @@ data_mod1_test <- BaseData %>%
 #####################################################################
 
 inner_tuner <- tnr("random_search")
-inner_resampling <- rsmp("cv", folds = 3)
-inner_terminator <- trm("evals", n_evals = 10)
+inner_resampling <- rsmp("cv", folds = 6)
+inner_terminator <- trm("evals", n_evals = 50)
 inner_measure <- msr("regr.msle")
 
 lrn_ranger_tmp = lts(lrn("regr.ranger"))
@@ -100,11 +100,10 @@ parallel::detectCores() #Check the number of cores available on your machine, co
 
 benchmark_design <- benchmark_grid(task_mod1,
                            list(rf = lrn_ranger_auto, 
-                                glmnet = lrn_glmnet_auto, 
                                 kkn = lrn_knn_auto,
                                 lm = lrn_lm, 
                                 baseline = lrn_baseline),
-                           rsmp("cv", folds = 3))
+                           rsmp("cv", folds = 8))
 
 future::plan("multisession") #Enables parallel computation
 benchmark_result <- benchmark_design %>% benchmark(store_models = T)
